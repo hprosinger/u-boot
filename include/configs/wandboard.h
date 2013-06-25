@@ -47,7 +47,7 @@
 
 #undef CONFIG_CMD_IMLS
 
-#define CONFIG_BOOTDELAY		5
+#define CONFIG_BOOTDELAY		1
 
 #define CONFIG_SYS_MEMTEST_START	0x10000000
 #define CONFIG_SYS_MEMTEST_END		(CONFIG_SYS_MEMTEST_START + 500 * SZ_1M)
@@ -68,6 +68,7 @@
 #define CONFIG_DOS_PARTITION
 
 /* Ethernet Configuration */
+/*
 #define CONFIG_CMD_PING
 #define CONFIG_CMD_DHCP
 #define CONFIG_CMD_MII
@@ -80,7 +81,7 @@
 #define CONFIG_FEC_MXC_PHYADDR		1
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_ATHEROS
-
+*/
 #if defined(CONFIG_MX6DL)
 #define CONFIG_DEFAULT_FDT_FILE		"imx6dl-wandboard.dtb"
 #elif defined(CONFIG_MX6S)
@@ -98,12 +99,16 @@
 	"boot_fdt=try\0" \
 	"ip_dyn=yes\0" \
 	"mmcdev=0\0" \
-	"mmcpart=2\0" \
+	"mmcpart=1\0" \
 	"mmcroot=/dev/mmcblk0p3 rootwait rw\0" \
 	"mmcargs=setenv bootargs console=${console},${baudrate} " \
 		"root=${mmcroot}\0" \
 	"loadbootscript=" \
-		"fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script};\0" \
+		"if ext2load mmc ${mmcdev}:${mmcpart} ${loadaddr} ${script}; then " \
+			"true; " \
+		"else " \
+			"ext2load mmc ${mmcdev}:${mmcpart} ${loadaddr} backup/${script}; " \
+		"fi;\0" \
 	"bootscript=echo Running bootscript from mmc ...; " \
 		"source\0" \
 	"loaduimage=fatload mmc ${mmcdev}:${mmcpart} ${loadaddr} ${uimage}\0" \
@@ -148,17 +153,27 @@
 			"bootm; " \
 		"fi;\0"
 
+/* check more devices that may contain the bootscript (SD1, and SD3)
+ * this code should be kicked for the final product!!!!!
+*/
 #define CONFIG_BOOTCOMMAND \
-	   "mmc dev ${mmcdev}; if mmc rescan; then " \
-		   "if run loadbootscript; then " \
-			   "run bootscript; " \
-		   "else " \
-			   "if run loaduimage; then " \
-				   "run mmcboot; " \
-			   "else run netboot; " \
-			   "fi; " \
-		   "fi; " \
-	   "else run netboot; fi"
+	   "mmc dev ${mmcdev}; " \
+	   "if mmc rescan; then " \
+		"true; " \
+	   "else " \
+		"setenv mmcdev 1; " \
+		"mmc dev ${mmcdev}; " \
+		"mmc rescan; " \
+	   "fi; " \
+	   "if run loadbootscript; then " \
+	   	"run bootscript; " \
+	   "else " \
+	 	"if run loaduimage; then " \
+			"run mmcboot; " \
+		"else " \
+			"run netboot; " \
+		"fi; " \
+	   "fi; " 
 
 /* Miscellaneous configurable options */
 #define CONFIG_SYS_LONGHELP
