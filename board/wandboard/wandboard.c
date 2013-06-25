@@ -52,6 +52,16 @@ static iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_CSI0_DAT11__UART1_RXD | MUX_PAD_CTRL(UART_PAD_CTRL),
 };
 
+static iomux_v3_cfg_t const usdhc1_pads[] = {
+	MX6_PAD_SD1_CLK__USDHC1_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD1_CMD__USDHC1_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD1_DAT0__USDHC1_DAT0 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD1_DAT1__USDHC1_DAT1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD1_DAT2__USDHC1_DAT2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_SD1_DAT3__USDHC1_DAT3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_GPIO_2__GPIO_1_2      | MUX_PAD_CTRL(NO_PAD_CTRL), /*CD*/
+};
+
 static iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_CLK__USDHC3_CLK   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_CMD__USDHC3_CMD   | MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -59,6 +69,7 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 	MX6_PAD_SD3_DAT1__USDHC3_DAT1 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT2__USDHC3_DAT2 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
 	MX6_PAD_SD3_DAT3__USDHC3_DAT3 | MUX_PAD_CTRL(USDHC_PAD_CTRL),
+	MX6_PAD_EIM_DA9__GPIO_3_9     | MUX_PAD_CTRL(NO_PAD_CTRL), /*CD*/
 };
 
 static iomux_v3_cfg_t const enet_pads[] = {
@@ -96,18 +107,38 @@ static void setup_iomux_enet(void)
 	gpio_set_value(ETH_PHY_RESET, 1);
 }
 
-static struct fsl_esdhc_cfg usdhc_cfg[1] = {
-	{USDHC3_BASE_ADDR},
+static struct fsl_esdhc_cfg usdhc_cfg[2] = {
+	{USDHC1_BASE_ADDR, 1, 1, 1, 0},
+	{USDHC3_BASE_ADDR, 1, 1, 1, 0},
+};
+
+int board_mmc_getcd(struct mmc *mmc)
+{
+	struct fsl_esdhc_cfg *cfg = (struct fsl_esdhc_cfg *)mmc->priv;
+	int ret;
+
+	if (cfg->esdhc_base == USDHC1_BASE_ADDR) {
+		gpio_direction_input(IMX_GPIO_NR(1, 2));
+		ret = !gpio_get_value(IMX_GPIO_NR(1, 2));
+	} else {
+		gpio_direction_input(IMX_GPIO_NR(3, 9));
+		ret = !gpio_get_value(IMX_GPIO_NR(3, 9));
+	}
+
+	return ret;
 };
 
 int board_mmc_init(bd_t *bis)
 {
+	s32 status = 0;	
+	
+	imx_iomux_v3_setup_multiple_pads(usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
+	status |= fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
+
 	imx_iomux_v3_setup_multiple_pads(usdhc3_pads, ARRAY_SIZE(usdhc3_pads));
+	status |= fsl_esdhc_initialize(bis, &usdhc_cfg[1]);
 
-	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC3_CLK);
-	usdhc_cfg[0].max_bus_width = 4;
-
-	return fsl_esdhc_initialize(bis, &usdhc_cfg[0]);
+	return status;
 }
 
 static int mx6_rgmii_rework(struct phy_device *phydev)
