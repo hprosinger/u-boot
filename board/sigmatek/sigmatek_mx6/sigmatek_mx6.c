@@ -24,6 +24,9 @@
 #include <miiphy.h>
 #include <netdev.h>
 
+#include <asm/imx-common/mxc_i2c.h>
+#include <i2c.h>
+
 DECLARE_GLOBAL_DATA_PTR;
 
 #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
@@ -40,12 +43,27 @@ DECLARE_GLOBAL_DATA_PTR;
 
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
 
-int dram_init(void)
-{
-	gd->ram_size = CONFIG_DDR_MB * SZ_1M;
+#ifdef CONFIG_DETECT_HZS
+#define I2C_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE |		\
+	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
+	PAD_CTL_DSE_40ohm | PAD_CTL_HYS |			\
+	PAD_CTL_ODE | PAD_CTL_SRE_FAST)
+#define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
 
-	return 0;
-}
+/* I2C3, lasal eeprom */
+static struct i2c_pads_info i2c_pad_info2 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_GPIO_5__I2C3_SCL | PC,
+		.gpio_mode = MX6_PAD_GPIO_5__GPIO_1_5 | PC,
+		.gp = IMX_GPIO_NR(1, 5)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_GPIO_6__I2C3_SDA | PC,
+		.gpio_mode = MX6_PAD_GPIO_6__GPIO_1_6 | PC,
+		.gp = IMX_GPIO_NR(1, 6)
+	}
+};
+#endif /* CONFIG_DETECT_HZS */
 
 static iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_CSI0_DAT10__UART1_TXD | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -111,6 +129,14 @@ static struct fsl_esdhc_cfg usdhc_cfg[2] = {
 	{USDHC1_BASE_ADDR, 1, 1, 1, 0},
 	{USDHC3_BASE_ADDR, 1, 1, 1, 0},
 };
+
+
+int dram_init(void)
+{
+	gd->ram_size = CONFIG_DDR_MB * SZ_1M;
+
+	return 0;
+}
 
 int board_mmc_getcd(struct mmc *mmc)
 {
@@ -197,6 +223,18 @@ int board_init(void)
 {
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
+
+#ifdef CONFIG_DETECT_HZS
+	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
+
+	if (i2c_probe(0x50) == 0) {
+		puts("Detect: found lasal eeprom\n");
+	} else {
+		/* No eeprom: pretend to be a wandboard */
+		puts("Detect: no eeprom. Switch to Wandboard\n");
+		gd->bd->bi_arch_number = 4412;
+	}
+#endif
 
 	return 0;
 }

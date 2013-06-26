@@ -68,7 +68,6 @@
 #define CONFIG_DOS_PARTITION
 
 /* Ethernet Configuration */
-/*
 #define CONFIG_CMD_PING
 #define CONFIG_CMD_DHCP
 #define CONFIG_CMD_MII
@@ -81,7 +80,15 @@
 #define CONFIG_FEC_MXC_PHYADDR		1
 #define CONFIG_PHYLIB
 #define CONFIG_PHY_ATHEROS
-*/
+
+/* I2C Configs */
+#define CONFIG_DETECT_HZS
+#define CONFIG_HARD_I2C
+#define CONFIG_I2C_MXC
+#define CONFIG_SYS_I2C_BASE		I2C3_BASE_ADDR
+#define CONFIG_SYS_I2C_SPEED		100000
+
+/* Device tree config */
 #if defined(CONFIG_MX6DL)
 #define CONFIG_DEFAULT_FDT_FILE		"imx6dl-sigmatek_mx6.dtb"
 #elif defined(CONFIG_MX6S)
