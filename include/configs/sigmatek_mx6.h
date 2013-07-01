@@ -85,8 +85,10 @@
 #define CONFIG_DETECT_HZS
 #define CONFIG_HARD_I2C
 #define CONFIG_I2C_MXC
-#define CONFIG_SYS_I2C_BASE		I2C3_BASE_ADDR
-#define CONFIG_SYS_I2C_SPEED		100000
+#define CONFIG_SYS_I2C_BASE                 I2C3_BASE_ADDR
+#define CONFIG_SYS_I2C_SPEED                100000
+#define CONFIG_SYS_I2C_EEPROM_ADDR          0x50
+#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN      2
 
 /* Device tree config */
 #if defined(CONFIG_MX6DL)

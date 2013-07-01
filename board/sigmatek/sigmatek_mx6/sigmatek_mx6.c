@@ -200,9 +200,24 @@ int board_phy_config(struct phy_device *phydev)
 	return 0;
 }
 
+static int i2c_read_mac(uchar *buffer)
+{
+	if (i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x33,
+			CONFIG_SYS_I2C_EEPROM_ADDR_LEN, buffer, 6)) {
+		puts("eeprom: read failed\n");
+		return -1;
+	}
+	printf("eeprom: read mac %pM\n", buffer);
+	return 0;
+}
+
 int board_eth_init(bd_t *bis)
 {
 	int ret;
+	unsigned char mac_addr[6];
+
+	if (!eth_getenv_enetaddr("ethaddr", mac_addr) && !i2c_read_mac(mac_addr))
+		eth_setenv_enetaddr("ethaddr", mac_addr);
 
 	setup_iomux_enet();
 
@@ -227,12 +242,13 @@ int board_init(void)
 #ifdef CONFIG_DETECT_HZS
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
 
-	if (i2c_probe(0x50) == 0) {
-		puts("Detect: found lasal eeprom\n");
-	} else {
+	if (i2c_probe(CONFIG_SYS_I2C_EEPROM_ADDR) != 0) {
 		/* No eeprom: pretend to be a wandboard */
 		puts("Detect: no eeprom. Switch to Wandboard\n");
 		gd->bd->bi_arch_number = 4412;
+		return 0;
+	} else {
+		puts("Detect: found lasal eeprom\n");
 	}
 #endif
 
