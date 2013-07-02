@@ -91,23 +91,23 @@ static iomux_v3_cfg_t const usdhc3_pads[] = {
 };
 
 static iomux_v3_cfg_t const enet_pads[] = {
-	MX6_PAD_ENET_MDIO__ENET_MDIO		| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_ENET_MDC__ENET_MDC		| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TXC__ENET_RGMII_TXC	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TD0__ENET_RGMII_TD0	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TD1__ENET_RGMII_TD1	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TD2__ENET_RGMII_TD2	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TD3__ENET_RGMII_TD3	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_TX_CTL__RGMII_TX_CTL	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_ENET_REF_CLK__ENET_TX_CLK	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RXC__ENET_RGMII_RXC	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RD0__ENET_RGMII_RD0	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RD1__ENET_RGMII_RD1	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RD2__ENET_RGMII_RD2	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RD3__ENET_RGMII_RD3	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	MX6_PAD_RGMII_RX_CTL__RGMII_RX_CTL	| MUX_PAD_CTRL(ENET_PAD_CTRL),
-	/* AR8031 PHY Reset */
-	MX6_PAD_EIM_D29__GPIO_3_29		| MUX_PAD_CTRL(NO_PAD_CTRL),
+	MX6_PAD_KEY_ROW1__ENET_COL        | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_KEY_COL3__ENET_CRS        | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_MDC__ENET_MDC        | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_MDIO__ENET_MDIO      | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_GPIO_18__ENET_RX_CLK      | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_RXD0__ENET_RDATA_0   | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_RXD1__ENET_RDATA_1   | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_KEY_COL2__ENET_RDATA_2    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_KEY_COL0__ENET_RDATA_3    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_CRS_DV__ENET_RX_EN   | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_RX_ER__ENET_RX_ER    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_REF_CLK__ENET_TX_CLK | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_TXD0__ENET_TDATA_0   | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_TXD1__ENET_TDATA_1   | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_KEY_ROW2__ENET_TDATA_2    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_KEY_ROW0__ENET_TDATA_3    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX6_PAD_ENET_TX_EN__ENET_TX_EN    | MUX_PAD_CTRL(ENET_PAD_CTRL),
 };
 
 static void setup_iomux_uart(void)
@@ -118,11 +118,6 @@ static void setup_iomux_uart(void)
 static void setup_iomux_enet(void)
 {
 	imx_iomux_v3_setup_multiple_pads(enet_pads, ARRAY_SIZE(enet_pads));
-
-	/* Reset AR8031 PHY */
-	gpio_direction_output(ETH_PHY_RESET, 0);
-	udelay(500);
-	gpio_set_value(ETH_PHY_RESET, 1);
 }
 
 static struct fsl_esdhc_cfg usdhc_cfg[2] = {
@@ -165,39 +160,6 @@ int board_mmc_init(bd_t *bis)
 	status |= fsl_esdhc_initialize(bis, &usdhc_cfg[1]);
 
 	return status;
-}
-
-static int mx6_rgmii_rework(struct phy_device *phydev)
-{
-	unsigned short val;
-
-	/* To enable AR8031 ouput a 125MHz clk from CLK_25M */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x7);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, 0x8016);
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xd, 0x4007);
-
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0xe);
-	val &= 0xffe3;
-	val |= 0x18;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0xe, val);
-
-	/* introduce tx clock delay */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1d, 0x5);
-	val = phy_read(phydev, MDIO_DEVAD_NONE, 0x1e);
-	val |= 0x0100;
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x1e, val);
-
-	return 0;
-}
-
-int board_phy_config(struct phy_device *phydev)
-{
-	mx6_rgmii_rework(phydev);
-
-	if (phydev->drv->config)
-		phydev->drv->config(phydev);
-
-	return 0;
 }
 
 static int i2c_read_mac(uchar *buffer)
