@@ -65,6 +65,10 @@ static struct i2c_pads_info i2c_pad_info2 = {
 };
 #endif /* CONFIG_DETECT_HZS */
 
+static iomux_v3_cfg_t const led_pads[] = {
+	MX6_PAD_SD2_DAT1__GPIO_1_14 | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
 static iomux_v3_cfg_t const uart1_pads[] = {
 	MX6_PAD_CSI0_DAT10__UART1_TXD | MUX_PAD_CTRL(UART_PAD_CTRL),
 	MX6_PAD_CSI0_DAT11__UART1_RXD | MUX_PAD_CTRL(UART_PAD_CTRL),
@@ -109,6 +113,12 @@ static iomux_v3_cfg_t const enet_pads[] = {
 	MX6_PAD_KEY_ROW0__ENET_TDATA_3    | MUX_PAD_CTRL(ENET_PAD_CTRL),
 	MX6_PAD_ENET_TX_EN__ENET_TX_EN    | MUX_PAD_CTRL(ENET_PAD_CTRL),
 };
+
+static void setup_iomux_leds(void)
+{
+	imx_iomux_v3_setup_multiple_pads(led_pads, ARRAY_SIZE(led_pads));
+	gpio_direction_output(IMX_GPIO_NR(1, 14), 0);
+}
 
 static void setup_iomux_uart(void)
 {
@@ -213,6 +223,7 @@ int board_init(void)
 		puts("Detect: found lasal eeprom\n");
 	}
 #endif
+	setup_iomux_leds();
 
 	return 0;
 }
