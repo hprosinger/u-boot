@@ -189,6 +189,7 @@ int board_early_init_f(void)
 
 int board_init(void)
 {
+	uchar cpuName[0x0F];
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
@@ -201,7 +202,15 @@ int board_init(void)
 		gd->bd->bi_arch_number = 4412;
 		return 0;
 	} else {
-		puts("Detect: found lasal eeprom\n");
+		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 1, cpuName, 0x0F);
+		if (!strcmp((char*)cpuName, "HZS 558-H"))
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS558H;
+		else if (!strcmp((char*)cpuName, "HGT 1035-H"))
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H;
+		else
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS558H;
+
+		printf("Detect: found sigmatek board: %s\n", cpuName);
 	}
 #endif
 	setup_iomux_leds();
