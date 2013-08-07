@@ -203,12 +203,14 @@ int board_init(void)
 		return 0;
 	} else {
 		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 1, cpuName, 0x0F);
-		if (!strcmp((char*)cpuName, "HZS 558-H"))
-			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS558H;
+		if (!strcmp((char*)cpuName, "HZS 558-H")) /* Old name for HZS731 */
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
+		else if (!strcmp((char*)cpuName, "HZS 731-H"))
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 		else if (!strcmp((char*)cpuName, "HGT 1035-H"))
 			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H;
 		else
-			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS558H;
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 
 		printf("Detect: found sigmatek board: %s\n", cpuName);
 	}
