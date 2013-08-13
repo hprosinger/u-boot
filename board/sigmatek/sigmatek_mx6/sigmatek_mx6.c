@@ -204,13 +204,15 @@ int board_init(void)
 	} else {
 		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 1, cpuName, 0x0F);
 		if (!strcmp((char*)cpuName, "HGT 1035-H")) {
-			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H;
+			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H_PROTO;
 		} else {
 			i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 2, cpuName, 0x0F);
 			if (!strcmp((char*)cpuName, "HZS 558-H")) /* Old name for HZS731 */
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 			else if (!strcmp((char*)cpuName, "HZS 731-H"))
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
+			else if (!strcmp((char*)cpuName, "HGT 1035-H"))
+				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H;
 			else
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 		}
