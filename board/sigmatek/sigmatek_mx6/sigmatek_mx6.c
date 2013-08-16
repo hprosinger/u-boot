@@ -28,6 +28,7 @@
 #include <i2c.h>
 
 DECLARE_GLOBAL_DATA_PTR;
+static int eeprom_address_len;
 
 #define UART_PAD_CTRL  (PAD_CTL_PKE | PAD_CTL_PUE |		\
 	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
@@ -156,7 +157,7 @@ int board_mmc_init(bd_t *bis)
 static int i2c_read_mac(uchar *buffer)
 {
 	if (i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x33,
-			CONFIG_SYS_I2C_EEPROM_ADDR_LEN, buffer, 6)) {
+			eeprom_address_len, buffer, 6)) {
 		puts("eeprom: read failed\n");
 		return -1;
 	}
@@ -202,11 +203,13 @@ int board_init(void)
 		gd->bd->bi_arch_number = 4412;
 		return 0;
 	} else {
-		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 1, cpuName, 0x0F);
+		eeprom_address_len = 1;
+		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, eeprom_address_len, cpuName, 0x0F);
 		if (!strcmp((char*)cpuName, "HGT 1035-H")) {
 			gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H_PROTO;
 		} else {
-			i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, 2, cpuName, 0x0F);
+			eeprom_address_len = 2;
+			i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, eeprom_address_len, cpuName, 0x0F);
 			if (!strcmp((char*)cpuName, "HZS 558-H")) /* Old name for HZS731 */
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 			else if (!strcmp((char*)cpuName, "HZS 731-H"))
