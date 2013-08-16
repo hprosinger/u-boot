@@ -1,7 +1,8 @@
 /*
- * Copyright (C) 2012 Freescale Semiconductor, Inc.
+ * Copyright (C) 2012-2013 Freescale Semiconductor, Inc.
  *
  * Author: Fabio Estevam <fabio.estevam@freescale.com>
+ * Author: Jason Liu <r64343@freescale.com>
  *
  * See file CREDITS for list of people who contributed to this
  * project.
@@ -22,11 +23,15 @@
 #include <asm/arch/clock.h>
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/iomux.h>
-#include <asm/arch/mx6q_pins.h>
+#include <asm/arch/mx6-pins.h>
 #include <asm/errno.h>
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/imx-common/boot_mode.h>
+#if CONFIG_I2C_MXC
+#include <i2c.h>
+#include <asm/imx-common/mxc_i2c.h>
+#endif
 #include <mmc.h>
 #include <fsl_esdhc.h>
 #include <miiphy.h>
@@ -46,9 +51,35 @@ DECLARE_GLOBAL_DATA_PTR;
 	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED   |		\
 	PAD_CTL_DSE_40ohm   | PAD_CTL_HYS)
 
+#define SPI_PAD_CTRL (PAD_CTL_HYS |				\
+	PAD_CTL_SPEED_MED |		\
+	PAD_CTL_DSE_40ohm | PAD_CTL_SRE_FAST)
+
+#define I2C_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE |		\
+	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
+	PAD_CTL_DSE_40ohm | PAD_CTL_HYS |			\
+	PAD_CTL_ODE | PAD_CTL_SRE_FAST)
+
+#if CONFIG_I2C_MXC
+#define PC MUX_PAD_CTRL(I2C_PAD_CTRL)
+/* I2C2 Camera, MIPI, pfuze */
+struct i2c_pads_info i2c_pad_info1 = {
+	.scl = {
+		.i2c_mode = MX6_PAD_KEY_COL3__I2C2_SCL | PC,
+		.gpio_mode = MX6_PAD_KEY_COL3__GPIO_4_12 | PC,
+		.gp = IMX_GPIO_NR(4, 12)
+	},
+	.sda = {
+		.i2c_mode = MX6_PAD_KEY_ROW3__I2C2_SDA | PC,
+		.gpio_mode = MX6_PAD_KEY_ROW3__GPIO_4_13 | PC,
+		.gp = IMX_GPIO_NR(4, 13)
+	}
+};
+#endif
+
 int dram_init(void)
 {
-	gd->ram_size = get_ram_size((void *)PHYS_SDRAM, PHYS_SDRAM_SIZE);
+	gd->ram_size = ((ulong)CONFIG_DDR_MB * 1024 * 1024);
 
 	return 0;
 }
@@ -87,6 +118,22 @@ static void setup_iomux_enet(void)
 	udelay(500);
 	gpio_set_value(IMX_GPIO_NR(1, 25), 1);
 }
+
+#ifdef CONFIG_SYS_USE_SPINOR
+iomux_v3_cfg_t const ecspi1_pads[] = {
+	MX6_PAD_KEY_COL0__ECSPI1_SCLK | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_COL1__ECSPI1_MISO | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_ROW0__ECSPI1_MOSI | MUX_PAD_CTRL(SPI_PAD_CTRL),
+	MX6_PAD_KEY_ROW1__GPIO_4_9    | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
+void setup_spinor(void)
+{
+	imx_iomux_v3_setup_multiple_pads(ecspi1_pads,
+					 ARRAY_SIZE(ecspi1_pads));
+	gpio_direction_output(IMX_GPIO_NR(4, 9), 0);
+}
+#endif
 
 iomux_v3_cfg_t const usdhc2_pads[] = {
 	MX6_PAD_SD2_CLK__USDHC2_CLK	| MUX_PAD_CTRL(USDHC_PAD_CTRL),
@@ -134,12 +181,125 @@ static void setup_iomux_uart(void)
 	imx_iomux_v3_setup_multiple_pads(uart1_pads, ARRAY_SIZE(uart1_pads));
 }
 
+#ifdef CONFIG_I2C_MXC
+static int setup_pmic_voltages(void)
+{
+	unsigned char value, rev_id = 0 ;
+	i2c_init(CONFIG_SYS_I2C_SPEED, CONFIG_SYS_I2C_SLAVE);
+	if (!i2c_probe(0x8)) {
+		if (i2c_read(0x8, 0, 1, &value, 1)) {
+			printf("Read device ID error!\n");
+			return -1;
+		}
+		if (i2c_read(0x8, 3, 1, &rev_id, 1)) {
+			printf("Read Rev ID error!\n");
+			return -1;
+		}
+		printf("Found PFUZE100! deviceid=%x,revid=%x\n", value, rev_id);
+		/*For camera streaks issue,swap VGEN5 and VGEN3 to power camera.
+		*sperate VDDHIGH_IN and camera 2.8V power supply, after switch:
+		*VGEN5 for VDDHIGH_IN and increase to 3V to align with datasheet
+		*VGEN3 for camera 2.8V power supply
+		*/
+		/*increase VGEN3 from 2.5 to 2.8V*/
+		if (i2c_read(0x8, 0x6e, 1, &value, 1)) {
+			printf("Read VGEN3 error!\n");
+			return -1;
+		}
+		value &= ~0xf;
+		value |= 0xa;
+		if (i2c_write(0x8, 0x6e, 1, &value, 1)) {
+			printf("Set VGEN3 error!\n");
+			return -1;
+		}
+		/*increase VGEN5 from 2.8 to 3V*/
+		if (i2c_read(0x8, 0x70, 1, &value, 1)) {
+			printf("Read VGEN5 error!\n");
+			return -1;
+		}
+		value &= ~0xf;
+		value |= 0xc;
+		if (i2c_write(0x8, 0x70, 1, &value, 1)) {
+			printf("Set VGEN5 error!\n");
+			return -1;
+		}
+		/* set SW1AB staby volatage 0.975V*/
+		if (i2c_read(0x8, 0x21, 1, &value, 1)) {
+			printf("Read SW1ABSTBY error!\n");
+			return -1;
+		}
+		value &= ~0x3f;
+		value |= 0x1b;
+		if (i2c_write(0x8, 0x21, 1, &value, 1)) {
+			printf("Set SW1ABSTBY error!\n");
+			return -1;
+		}
+		/* set SW1AB/VDDARM step ramp up time from 16us to 4us/25mV */
+		if (i2c_read(0x8, 0x24, 1, &value, 1)) {
+			printf("Read SW1ABSTBY error!\n");
+			return -1;
+		}
+		value &= ~0xc0;
+		value |= 0x40;
+		if (i2c_write(0x8, 0x24, 1, &value, 1)) {
+			printf("Set SW1ABSTBY error!\n");
+			return -1;
+		}
+
+		/* set SW1C staby volatage 0.975V*/
+		if (i2c_read(0x8, 0x2f, 1, &value, 1)) {
+			printf("Read SW1CSTBY error!\n");
+			return -1;
+		}
+		value &= ~0x3f;
+		value |= 0x1b;
+		if (i2c_write(0x8, 0x2f, 1, &value, 1)) {
+			printf("Set SW1CSTBY error!\n");
+			return -1;
+		}
+
+		/* set SW1C/VDDSOC step ramp up time to from 16us to 4us/25mV */
+		if (i2c_read(0x8, 0x32, 1, &value, 1)) {
+			printf("Read SW1ABSTBY error!\n");
+			return -1;
+		}
+		value &= ~0xc0;
+		value |= 0x40;
+		if (i2c_write(0x8, 0x32, 1, &value, 1)) {
+			printf("Set SW1ABSTBY error!\n");
+			return -1;
+		}
+	}
+
+	return 0;
+}
+#endif
+
+
 #ifdef CONFIG_FSL_ESDHC
 struct fsl_esdhc_cfg usdhc_cfg[3] = {
 	{USDHC2_BASE_ADDR},
 	{USDHC3_BASE_ADDR},
 	{USDHC4_BASE_ADDR},
 };
+
+int mmc_get_env_devno(void)
+{
+	u32 soc_sbmr = readl(SRC_BASE_ADDR + 0x4);
+	u32 dev_no;
+
+	/* BOOT_CFG2[3] and BOOT_CFG2[4] */
+	dev_no = (soc_sbmr & 0x00001800) >> 11;
+
+	/* need ubstract 1 to map to the mmc device id
+	 * see the comments in board_mmc_init function
+	 */
+
+	dev_no--;
+
+	return dev_no;
+}
+
 
 #define USDHC2_CD_GPIO	IMX_GPIO_NR(2, 2)
 #define USDHC3_CD_GPIO	IMX_GPIO_NR(2, 0)
@@ -208,6 +368,31 @@ int board_mmc_init(bd_t *bis)
 }
 #endif
 
+#ifdef CONFIG_CMD_SATA
+int setup_sata(void)
+{
+	struct iomuxc_base_regs *const iomuxc_regs
+		= (struct iomuxc_base_regs *) IOMUXC_BASE_ADDR;
+	int ret = enable_sata_clock();
+	if (ret)
+		return ret;
+
+	clrsetbits_le32(&iomuxc_regs->gpr[13],
+			IOMUXC_GPR13_SATA_MASK,
+			IOMUXC_GPR13_SATA_PHY_8_RXEQ_3P0DB
+			|IOMUXC_GPR13_SATA_PHY_7_SATA2M
+			|IOMUXC_GPR13_SATA_SPEED_3G
+			|(3<<IOMUXC_GPR13_SATA_PHY_6_SHIFT)
+			|IOMUXC_GPR13_SATA_SATA_PHY_5_SS_DISABLED
+			|IOMUXC_GPR13_SATA_SATA_PHY_4_ATTEN_9_16
+			|IOMUXC_GPR13_SATA_PHY_3_TXBOOST_0P00_DB
+			|IOMUXC_GPR13_SATA_PHY_2_TX_1P104V
+			|IOMUXC_GPR13_SATA_PHY_1_SLOW);
+
+	return 0;
+}
+#endif
+
 int mx6_rgmii_rework(struct phy_device *phydev)
 {
 	unsigned short val;
@@ -258,6 +443,13 @@ int board_early_init_f(void)
 {
 	setup_iomux_uart();
 
+#ifdef CONFIG_SYS_USE_SPINOR
+	setup_spinor();
+#endif
+
+#ifdef CONFIG_CMD_SATA
+	setup_sata();
+#endif
 	return 0;
 }
 
@@ -282,8 +474,17 @@ static const struct boot_mode board_boot_modes[] = {
 
 int board_late_init(void)
 {
+	int ret = 0;
 #ifdef CONFIG_CMD_BMODE
 	add_board_boot_modes(board_boot_modes);
+#endif
+
+#ifdef CONFIG_I2C_MXC
+	setup_i2c(1, CONFIG_SYS_I2C_SPEED,
+			CONFIG_SYS_I2C_SLAVE, &i2c_pad_info1);
+	ret = setup_pmic_voltages();
+	if (ret)
+		return -1;
 #endif
 
 	return 0;
@@ -291,7 +492,7 @@ int board_late_init(void)
 
 int checkboard(void)
 {
-	puts("Board: MX6Q-SabreSD\n");
+	puts("Board: MX6Q/SDL-SabreSD\n");
 
 	return 0;
 }

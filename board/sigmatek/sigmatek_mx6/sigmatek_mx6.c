@@ -14,6 +14,7 @@
 #include <asm/arch/imx-regs.h>
 #include <asm/arch/mx6-pins.h>
 #include <asm/arch/sys_proto.h>
+#include <asm/arch/crm_regs.h>
 #include <asm/gpio.h>
 #include <asm/imx-common/iomux-v3.h>
 #include <asm/io.h>
@@ -42,7 +43,13 @@ static int eeprom_address_len;
 	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED   |		\
 	PAD_CTL_DSE_40ohm   | PAD_CTL_HYS)
 
+
 #define ETH_PHY_RESET		IMX_GPIO_NR(3, 29)
+
+#define GPMI_PAD_CTRL0 (PAD_CTL_PKE | PAD_CTL_PUE | PAD_CTL_PUS_100K_UP)
+#define GPMI_PAD_CTRL1 (PAD_CTL_DSE_40ohm | PAD_CTL_SPEED_MED | \
+			PAD_CTL_SRE_FAST)
+#define GPMI_PAD_CTRL2 (GPMI_PAD_CTRL0 | GPMI_PAD_CTRL1)
 
 #ifdef CONFIG_DETECT_HZS
 #define I2C_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE |		\
@@ -125,6 +132,61 @@ static struct fsl_esdhc_cfg usdhc_cfg[] = {
 };
 
 
+#ifdef CONFIG_SYS_USE_NAND
+static iomux_v3_cfg_t const gpmi_pads[] = {
+	MX6_PAD_NANDF_CLE__RAWNAND_CLE		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_ALE__RAWNAND_ALE		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_WP_B__RAWNAND_RESETN	| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_RB0__RAWNAND_READY0	| MUX_PAD_CTRL(GPMI_PAD_CTRL0),
+	MX6_PAD_NANDF_CS0__RAWNAND_CE0N		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_SD4_CMD__RAWNAND_RDN		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_SD4_CLK__RAWNAND_WRN		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D0__RAWNAND_D0		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D1__RAWNAND_D1		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D2__RAWNAND_D2		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D3__RAWNAND_D3		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D4__RAWNAND_D4		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D5__RAWNAND_D5		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D6__RAWNAND_D6		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_NANDF_D7__RAWNAND_D7		| MUX_PAD_CTRL(GPMI_PAD_CTRL2),
+	MX6_PAD_SD4_DAT0__RAWNAND_DQS		| MUX_PAD_CTRL(GPMI_PAD_CTRL1),
+};
+
+static void setup_gpmi_nand(void)
+{
+	struct mxc_ccm_reg *mxc_ccm = (struct mxc_ccm_reg *)CCM_BASE_ADDR;
+
+	/* config gpmi nand iomux */
+	imx_iomux_v3_setup_multiple_pads(gpmi_pads, ARRAY_SIZE(gpmi_pads));
+
+	/* gate ENFC_CLK_ROOT clock first,before clk source switch */
+	clrbits_le32(&mxc_ccm->CCGR2, MXC_CCM_CCGR2_IOMUX_IPT_CLK_IO_MASK);
+
+	/* config gpmi and bch clock to 100 MHz */
+	clrsetbits_le32(&mxc_ccm->cs2cdr,
+			MXC_CCM_CS2CDR_ENFC_CLK_PODF_MASK |
+			MXC_CCM_CS2CDR_ENFC_CLK_PRED_MASK |
+			MXC_CCM_CS2CDR_ENFC_CLK_SEL_MASK,
+			MXC_CCM_CS2CDR_ENFC_CLK_PODF(0) |
+			MXC_CCM_CS2CDR_ENFC_CLK_PRED(3) |
+			MXC_CCM_CS2CDR_ENFC_CLK_SEL(3));
+
+	/* enable ENFC_CLK_ROOT clock */
+	setbits_le32(&mxc_ccm->CCGR2, MXC_CCM_CCGR2_IOMUX_IPT_CLK_IO_MASK);
+
+	/* enable gpmi and bch clock gating */
+	setbits_le32(&mxc_ccm->CCGR4,
+		     MXC_CCM_CCGR4_RAWNAND_U_BCH_INPUT_APB_MASK |
+		     MXC_CCM_CCGR4_RAWNAND_U_GPMI_BCH_INPUT_BCH_MASK |
+		     MXC_CCM_CCGR4_RAWNAND_U_GPMI_BCH_INPUT_GPMI_IO_MASK |
+		     MXC_CCM_CCGR4_RAWNAND_U_GPMI_INPUT_APB_MASK |
+		     MXC_CCM_CCGR4_PL301_MX6QPER1_BCH_OFFSET);
+
+	/* enable apbh clock gating */
+	setbits_le32(&mxc_ccm->CCGR0, MXC_CCM_CCGR0_APBHDMA_MASK);
+}
+#endif
+
 int dram_init(void)
 {
 	gd->ram_size = CONFIG_DDR_MB * SZ_1M;
@@ -143,7 +205,7 @@ int board_mmc_getcd(struct mmc *mmc)
 
 int board_mmc_init(bd_t *bis)
 {
-	s32 status = 0;	
+	int status = 0;
 	
 	imx_iomux_v3_setup_multiple_pads(usdhc1_pads, ARRAY_SIZE(usdhc1_pads));
 	usdhc_cfg[0].sdhc_clk = mxc_get_clock(MXC_ESDHC_CLK);
@@ -185,12 +247,17 @@ int board_eth_init(bd_t *bis)
 int board_early_init_f(void)
 {
 	setup_iomux_uart();
+#ifdef CONFIG_SYS_USE_NAND
+	setup_gpmi_nand();
+#endif
 	return 0;
 }
 
 int board_init(void)
 {
+
 	uchar cpuName[0x0F];
+
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 

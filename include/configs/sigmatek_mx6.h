@@ -12,6 +12,8 @@
 #ifndef __CONFIG_H
 #define __CONFIG_H
 
+#define CONFIG_SYS_USE_NAND
+
 #include <asm/arch/imx-regs.h>
 #include <asm/imx-common/gpio.h>
 #include <asm/sizes.h>
@@ -56,6 +58,23 @@
 #define CONFIG_LOADADDR			0x12000000
 #define CONFIG_SYS_TEXT_BASE		0x17800000
 
+#ifdef CONFIG_SYS_USE_NAND
+#define CONFIG_CMD_NAND
+#define CONFIG_CMD_NAND_TRIMFFS
+
+/* NAND stuff */
+#define CONFIG_NAND_MXS
+#define CONFIG_SYS_MAX_NAND_DEVICE	1
+#define CONFIG_SYS_NAND_BASE		0x40000000
+#define CONFIG_SYS_NAND_5_ADDR_CYCLE
+#define CONFIG_SYS_NAND_ONFI_DETECTION
+
+/* DMA stuff, needed for GPMI/MXS NAND support */
+#define CONFIG_APBH_DMA
+#define CONFIG_APBH_DMA_BURST
+#define CONFIG_APBH_DMA_BURST8
+#endif
+
 /* MMC Configuration */
 #define CONFIG_FSL_ESDHC
 #define CONFIG_FSL_USDHC
@@ -99,6 +118,24 @@
 #define CONFIG_DEFAULT_FDT_FILE		"imx6s-sigmatek_mx6.dtb"
 #endif
 
+#ifdef CONFIG_SYS_BOOT_NAND
+	/*
+	 * The partions' layout for NAND is:
+	 *     mtd0: 16M      (uboot)
+	 *     mtd1: 16M      (kernel)
+	 *     mtd2: 16M      (dtb)
+	 *     mtd3: left     (rootfs)
+	 */
+#define CONFIG_EXTRA_ENV_SETTINGS \
+	"fdt_addr=0x18000000\0" \
+	"fdt_high=0xffffffff\0"	  \
+	"bootargs=console=ttymxc0,115200 ubi.mtd=3 "  \
+		"root=ubi0:rootfs rootfstype=ubifs "		     \
+		"mtdparts=gpmi-nand:16m(boot),16m(kernel),16m(dtb),-(rootfs)\0"\
+	"bootcmd=nand read ${loadaddr} 0x1000000 0x800000;"\
+		"nand read ${fdt_addr} 0x2000000 0x100000;"\
+		"bootm ${loadaddr} - ${fdt_addr}\0"
+#else
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
 	"uimage=uImage\0" \
@@ -185,6 +222,7 @@
 			"run netboot; " \
 		"fi; " \
 	   "fi; " 
+#endif
 
 /* Miscellaneous configurable options */
 #define CONFIG_SYS_LONGHELP
@@ -221,9 +259,18 @@
 
 #define CONFIG_ENV_SIZE			(8 * 1024)
 
+#ifdef CONFIG_SYS_BOOT_NAND
+#define CONFIG_SYS_USE_NAND
+#define CONFIG_ENV_IS_IN_NAND
+#undef CONFIG_ENV_SIZE
+#define CONFIG_ENV_OFFSET		(8 << 20)
+#define CONFIG_ENV_SECT_SIZE		(128 << 10)
+#define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
+#else
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_ENV_OFFSET		(6 * 64 * 1024)
 #define CONFIG_SYS_MMC_ENV_DEV		0
+#endif /* CONFIG_SYS_BOOT_NAND */
 
 #define CONFIG_OF_LIBFDT
 #define CONFIG_CMD_BOOTZ
