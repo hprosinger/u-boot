@@ -73,7 +73,21 @@
 #define CONFIG_APBH_DMA
 #define CONFIG_APBH_DMA_BURST
 #define CONFIG_APBH_DMA_BURST8
-#endif
+
+/* MTD stuff */
+#define CONFIG_MTD_DEVICE
+#define CONFIG_MTD_PARTITIONS
+#define CONFIG_CMD_MTDPARTS     /* Enable MTD parts commands */
+#define MTDIDS_DEFAULT          "nand0=gpmi-nand"
+#define MTDPARTS_DEFAULT        "mtdparts=gpmi-nand:16m(uboot),-(ubisystem)"
+
+/* UBIFS stuff */
+#define CONFIG_CMD_UBI          /* UBI commands */
+#define CONFIG_CMD_UBIFS        /* UBIFS commands */
+#define CONFIG_RBTREE
+#define CONFIG_LZO              /* LZO is needed for UBIFS */
+
+#endif /* CONFIG_SYS_USE_NAND */
 
 /* MMC Configuration */
 #define CONFIG_FSL_ESDHC
@@ -122,19 +136,14 @@
 	/*
 	 * The partions' layout for NAND is:
 	 *     mtd0: 16M      (uboot)
-	 *     mtd1: 16M      (kernel)
-	 *     mtd2: 16M      (dtb)
-	 *     mtd3: left     (rootfs)
+	 *     mtd1: left     (ubisystem)
 	 */
 #define CONFIG_EXTRA_ENV_SETTINGS \
-	"fdt_addr=0x18000000\0" \
-	"fdt_high=0xffffffff\0"	  \
-	"bootargs=console=ttymxc0,115200 ubi.mtd=3 "  \
-		"root=ubi0:rootfs rootfstype=ubifs "		     \
-		"mtdparts=gpmi-nand:16m(boot),16m(kernel),16m(dtb),-(rootfs)\0"\
-	"bootcmd=nand read ${loadaddr} 0x1000000 0x800000;"\
-		"nand read ${fdt_addr} 0x2000000 0x100000;"\
-		"bootm ${loadaddr} - ${fdt_addr}\0"
+	"mtdparts=" MTDPARTS_DEFAULT "\0" \
+	"bootargs=console=ttymxc0,115200 ubi.mtd=1 " \
+		"root=ubi0:system rootfstype=ubifs " MTDPARTS_DEFAULT "\0" \
+	"bootcmd=ubi part ubisystem;ubifsmount ubi0:bootldr;ubifsload ${loadaddr} uImage;" \
+		"bootm\0"
 #else
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
@@ -222,7 +231,7 @@
 			"run netboot; " \
 		"fi; " \
 	   "fi; " 
-#endif
+#endif /* CONFIG_SYS_BOOT_NAND */
 
 /* Miscellaneous configurable options */
 #define CONFIG_SYS_LONGHELP
