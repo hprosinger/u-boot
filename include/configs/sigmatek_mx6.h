@@ -140,8 +140,8 @@
 	 */
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"mtdparts=" MTDPARTS_DEFAULT "\0" \
-	"bootargs=console=ttymxc0,115200 ubi.mtd=1 " \
-		"root=ubi0:system rootfstype=ubifs " MTDPARTS_DEFAULT "\0" \
+	"bootargs=console=ttymxc0,115200 video=mxcfb0 " \
+		"ubi.mtd=1 root=ubi0:system rootfstype=ubifs " MTDPARTS_DEFAULT "\0" \
 	"bootcmd=ubi part ubisystem;ubifsmount ubi0:bootldr;ubifsload ${loadaddr} uImage;" \
 		"bootm\0"
 #else
