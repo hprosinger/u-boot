@@ -117,7 +117,6 @@
 #define CONFIG_PHY_MICREL
 
 /* I2C Configs */
-#define CONFIG_DETECT_HZS
 #define CONFIG_HARD_I2C
 #define CONFIG_I2C_MXC
 #define CONFIG_SYS_I2C_BASE                 I2C3_BASE_ADDR

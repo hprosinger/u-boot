@@ -51,7 +51,6 @@ static int eeprom_address_len;
 			PAD_CTL_SRE_FAST)
 #define GPMI_PAD_CTRL2 (GPMI_PAD_CTRL0 | GPMI_PAD_CTRL1)
 
-#ifdef CONFIG_DETECT_HZS
 #define I2C_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_PUE |		\
 	PAD_CTL_PUS_100K_UP | PAD_CTL_SPEED_MED |		\
 	PAD_CTL_DSE_40ohm | PAD_CTL_HYS |			\
@@ -71,7 +70,6 @@ static struct i2c_pads_info i2c_pad_info2 = {
 		.gp = IMX_GPIO_NR(1, 6)
 	}
 };
-#endif /* CONFIG_DETECT_HZS */
 
 static iomux_v3_cfg_t const led_pads[] = {
 	MX6_PAD_SD2_DAT1__GPIO_1_14 | MUX_PAD_CTRL(NO_PAD_CTRL),
@@ -255,13 +253,9 @@ int board_early_init_f(void)
 
 int board_init(void)
 {
-
-	uchar cpuName[0x0F];
-
 	/* address of boot parameters */
 	gd->bd->bi_boot_params = PHYS_SDRAM + 0x100;
 
-#ifdef CONFIG_DETECT_HZS
 	setup_i2c(2, CONFIG_SYS_I2C_SPEED, 0x7f, &i2c_pad_info2);
 
 	if (i2c_probe(CONFIG_SYS_I2C_EEPROM_ADDR) != 0) {
@@ -270,6 +264,10 @@ int board_init(void)
 		gd->bd->bi_arch_number = 4412;
 		return 0;
 	} else {
+		uchar cpuName[0x10];
+
+		cpuName[0xf] = '\0';
+
 		eeprom_address_len = 1;
 		i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, eeprom_address_len, cpuName, 0x0F);
 		if (!strcmp((char*)cpuName, "HGT 1035-H")) {
@@ -277,18 +275,14 @@ int board_init(void)
 		} else {
 			eeprom_address_len = 2;
 			i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, 0x70, eeprom_address_len, cpuName, 0x0F);
-			if (!strcmp((char*)cpuName, "HZS 558-H")) /* Old name for HZS731 */
-				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
-			else if (!strcmp((char*)cpuName, "HZS 731-H"))
-				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
-			else if (!strcmp((char*)cpuName, "HGT 1035-H"))
+			if (!strcmp((char*)cpuName, "HGT 1035-H"))
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HGT1035H;
-			else
+			else /* "HZS 731-H", "HZS 558-H"(Old name for HZS731) */
 				gd->bd->bi_arch_number = MACH_TYPE_SIGMATEK_HZS731H;
 		}
 		printf("Detect: found sigmatek board: %s\n", cpuName);
 	}
-#endif
+
 	setup_iomux_leds();
 
 	return 0;
