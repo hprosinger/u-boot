@@ -144,6 +144,16 @@
 		"ubi.mtd=1 root=ubi0:system rootfstype=ubifs " MTDPARTS_DEFAULT "\0" \
 	"bootcmd=ubi part ubisystem;ubifsmount ubi0:bootldr;ubifsload ${loadaddr} uImage;" \
 		"bootm\0"
+
+#elif CONFIG_SYS_BOOT_UPDATER
+#define CONFIG_BOOTARGS \
+	"console=ttymxc0,115200 rdinit=/linuxrc"
+#define CONFIG_BOOTCOMMAND \
+	"bootm 0x10800000 0x10c00000"
+#undef CONFIG_BOOTDELAY
+#define CONFIG_BOOTDELAY 0
+#undef CONFIG_EXTRA_ENV_SETTINGS
+
 #else
 #define CONFIG_EXTRA_ENV_SETTINGS \
 	"script=boot.scr\0" \
@@ -275,11 +285,13 @@
 #define CONFIG_ENV_OFFSET		(8 << 20)
 #define CONFIG_ENV_SECT_SIZE		(128 << 10)
 #define CONFIG_ENV_SIZE			CONFIG_ENV_SECT_SIZE
+#elif CONFIG_SYS_BOOT_UPDATER
+#define CONFIG_ENV_IS_NOWHERE
 #else
 #define CONFIG_ENV_IS_IN_MMC
 #define CONFIG_ENV_OFFSET		(6 * 64 * 1024)
 #define CONFIG_SYS_MMC_ENV_DEV		0
-#endif /* CONFIG_SYS_BOOT_NAND */
+#endif
 
 #define CONFIG_OF_LIBFDT
 #define CONFIG_CMD_BOOTZ
