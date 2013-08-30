@@ -146,7 +146,7 @@
 
 #elif CONFIG_SYS_BOOT_UPDATER
 #define CONFIG_BOOTARGS \
-	"console=ttymxc0,115200 rdinit=/linuxrc"
+	"console=ttymxc0,115200 root=/dev/ram0 rdinit=/linuxrc " MTDPARTS_DEFAULT
 #define CONFIG_BOOTCOMMAND \
 	"bootm 0x10800000 0x10c00000"
 #undef CONFIG_BOOTDELAY
