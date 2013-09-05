@@ -167,9 +167,24 @@ void do_prefetch_abort (struct pt_regs *pt_regs)
 	bad_mode ();
 }
 
+static inline unsigned int get_fsr(void)
+{
+	unsigned int val;
+	asm("mrc p15, 0, %0, c5, c0, 0	@ get FSR" : "=r" (val) : : "cc");
+	return val;
+}
+
+static inline unsigned int get_far(void)
+{
+	unsigned int val;
+	asm("mrc p15, 0, %0, c6, c0, 0	@ get FSR" : "=r" (val) : : "cc");
+	return val;
+}
+
 void do_data_abort (struct pt_regs *pt_regs)
 {
-	printf ("data abort\n\n    MAYBE you should read doc/README.arm-unaligned-accesses\n\n");
+
+	printf ("data abort\nfsr 0x%x\nfar 0x%x\n    MAYBE you should read doc/README.arm-unaligned-accesses\n\n", get_fsr(), get_far());
 	show_regs (pt_regs);
 	bad_mode ();
 }
