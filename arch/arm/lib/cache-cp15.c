@@ -115,6 +115,14 @@ static inline void mmu_setup(void)
 		dram_bank_mmu_setup(i);
 	}
 
+	/* MMU entry for OCRAM */
+	set_section_dcache(0x00900000 >> 20, (1<<12)|DCACHE_OFF /*DCACHE_WRITETHROUGH*//*DCACHE_WRITEBACK*/);
+	/* MMU entry for EIM */
+	set_section_dcache(0x08000000 >> 20, (1<<12)|DCACHE_OFF /*DCACHE_WRITETHROUGH*//*DCACHE_WRITEBACK*/);
+#define START_CS3       (0x08000000 + (3*32*1024*1024))
+	set_section_dcache(START_CS3 >> 20, (1<<12)|DCACHE_OFF /*DCACHE_WRITETHROUGH*//*DCACHE_WRITEBACK*/);
+
+
 	/* Copy the page table address to cp15 */
 	asm volatile("mcr p15, 0, %0, c2, c0, 0"
 		     : : "r" (gd->arch.tlb_addr) : "memory");

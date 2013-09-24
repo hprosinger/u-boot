@@ -658,8 +658,10 @@ static void hgt1035h_init_eim(void)
 	}
 }
 
+#define START_OCRAM     0x00900000
 #define START_CS0       0x08000000
 #define START_CS1       (0x08000000 + (32*1024*1024))
+#define START_CS3       (0x08000000 + (3*32*1024*1024))
 
 #define PHYS_ADDR       START_CS0
 
@@ -686,8 +688,20 @@ static int eim_w4(char * const s)
 
 	addr = PHYS_ADDR + simple_strtol (s, NULL, 10);
 	t = (uint32_t *)addr;
-	printf("write %d to %p\n", sizeof(uint16_t), t);
+	printf("write %d to %p\n", sizeof(uint32_t), t);
 	*t = 0xaaaaaaaa;
+	return 0;
+}
+
+static int ocram_w4(char * const s)
+{
+	uint32_t addr;
+	uint32_t *t;
+
+	addr = START_CS3 + simple_strtol (s, NULL, 10);
+	t = (uint32_t *)addr;
+	printf("write %d to %p\n", sizeof(uint32_t), t);
+	*t = 0x02010201;
 	return 0;
 }
 
@@ -737,6 +751,9 @@ int do_eim(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		else
 			eim_w1(argv[2]);
 		break;
+	case 'm':
+		ocram_w4(argv[2]);
+		break;
 	default:
 		return cmd_usage(cmdtp);
 	}
@@ -748,5 +765,6 @@ U_BOOT_CMD(
 	"eim commands",
 	"\n"
 	"eim s         - setup eim interface\n"
-	"eim w4 offset - write to offset [0-3]"
+	"eim w4 offset - write to EIM offset [0-3]\n"
+	"eim m4 offset - write to OCRAM offset [0-3]\n"
 );
