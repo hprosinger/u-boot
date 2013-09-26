@@ -294,7 +294,6 @@ int board_init(void)
 int checkboard(void)
 {
 	puts("Board: Sigmatek mx6\n");
-
 	return 0;
 }
 
@@ -663,7 +662,16 @@ static void hgt1035h_init_eim(void)
 #define START_CS1       (0x08000000 + (32*1024*1024))
 #define START_CS3       (0x08000000 + (3*32*1024*1024))
 
-#define PHYS_ADDR       START_CS0
+#define PHYS_ADDR       START_CS1
+
+static uint32_t get_ltlbar(void)
+{
+	uint32_t ltlbar;
+
+	/* Read current CP15: MRC p15,5,<Rd>,c15,c7,2 */
+	asm volatile ("mrc p15, 5, %0, c15, c7, 2" : "=r" (ltlbar));
+	return ltlbar;
+}
 
 static void allow_unaligned(void)
 {
@@ -681,16 +689,29 @@ static int eim_setup(void)
 	return 0;
 }
 
-static int eim_w4(char * const s)
+int eim_w8(char * const s)
 {
 	uint32_t addr;
-	uint32_t *t;
+	uint64_t *t;
 
 	addr = PHYS_ADDR + simple_strtol (s, NULL, 10);
-	t = (uint32_t *)addr;
-	printf("write %d to %p\n", sizeof(uint32_t), t);
-	*t = 0xaaaaaaaa;
+	t = (uint64_t *)addr;
+	printf("write %d to %p\n", sizeof(uint64_t), t);
+	*t = 0x0807060504030201LL;
 	return 0;
+}
+
+int eim_r8(char * const s)
+{
+	uint32_t addr;
+	uint64_t *t;
+	uint64_t v;
+
+	addr = PHYS_ADDR + simple_strtol (s, NULL, 10);
+	t = (uint64_t *)addr;
+	printf("read %d to %p\n", sizeof(uint64_t), t);
+	v = *t;
+	return v;
 }
 
 static int ocram_w4(char * const s)
@@ -702,6 +723,19 @@ static int ocram_w4(char * const s)
 	t = (uint32_t *)addr;
 	printf("write %d to %p\n", sizeof(uint32_t), t);
 	*t = 0x02010201;
+	return 0;
+}
+
+static int eim_w4(char * const s)
+{
+	uint32_t addr;
+	uint32_t *t;
+
+	addr = PHYS_ADDR + simple_strtol (s, NULL, 10);
+	t = (uint32_t *)addr;
+	printf("write %d to %p (tlb 0x%x)\n", sizeof(uint32_t), t, get_ltlbar());
+	*t = 0xaaaaaaaa;
+	printf("write %d to %p (tlb 0x%x)\n", sizeof(uint32_t), t, get_ltlbar());
 	return 0;
 }
 
@@ -744,12 +778,18 @@ int do_eim(cmd_tbl_t *cmdtp, int flag, int argc, char * const argv[])
 		eim_setup();
 		break;
 	case 'w':	/* pld or pci */
-		if (cmd[1] == '4')
+		if (cmd[1] == '8')
+			eim_w8(argv[2]);
+		else if (cmd[1] == '4')
 			eim_w4(argv[2]);
 		else if (cmd[1] == '2')
 			eim_w2(argv[2]);
 		else
 			eim_w1(argv[2]);
+		break;
+	case 'r':
+		if (cmd[1] == '8')
+			eim_r8(argv[2]);
 		break;
 	case 'm':
 		ocram_w4(argv[2]);
@@ -765,6 +805,7 @@ U_BOOT_CMD(
 	"eim commands",
 	"\n"
 	"eim s         - setup eim interface\n"
-	"eim w4 offset - write to EIM offset [0-3]\n"
+	"eim w8 offset - write to EIM offset [0-3]\n"
+	"eim r8 offset - read from EIM offset [0-3]\n"
 	"eim m4 offset - write to OCRAM offset [0-3]\n"
 );
